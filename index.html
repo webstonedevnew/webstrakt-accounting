@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Webstrakt · Revenue & Cost Tracker</title>
+  <meta name="description" content="Elegant revenue and cost tracker for a web development business." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot" aria-hidden="true"></span>
+      <span class="brand-name">Webstrakt</span>
+      <span class="brand-sub">Accounting</span>
+    </div>
+
+    <div class="top-actions">
+      <select id="currency" class="ctrl" title="Currency" aria-label="Currency">
+        <option value="EUR">€ EUR</option>
+        <option value="USD">$ USD</option>
+        <option value="GBP">£ GBP</option>
+        <option value="CHF">CHF</option>
+        <option value="CAD">$ CAD</option>
+        <option value="AUD">$ AUD</option>
+        <option value="SEK">SEK</option>
+        <option value="NOK">NOK</option>
+        <option value="DKK">DKK</option>
+        <option value="PLN">PLN</option>
+        <option value="JPY">¥ JPY</option>
+        <option value="INR">₹ INR</option>
+      </select>
+
+      <button id="themeToggle" class="ctrl icon-btn" title="Toggle theme" aria-label="Toggle theme">
+        <span class="theme-icon">◐</span>
+      </button>
+
+      <div class="menu-wrap">
+        <button id="menuBtn" class="ctrl icon-btn" title="More" aria-label="More actions" aria-haspopup="true">⋯</button>
+        <div id="menu" class="menu" role="menu" hidden>
+          <button class="menu-item" data-action="export-json" role="menuitem">Export data (JSON)</button>
+          <button class="menu-item" data-action="export-csv" role="menuitem">Export entries (CSV)</button>
+          <button class="menu-item" data-action="import-json" role="menuitem">Import data (JSON)</button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" data-action="sample" role="menuitem">Load sample data</button>
+          <button class="menu-item danger" data-action="clear" role="menuitem">Clear all data</button>
+        </div>
+      </div>
+
+      <button id="addBtn" class="ctrl primary" data-action="add">+ Add entry</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Summary -->
+    <section class="panel summary-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Overview</h2>
+        <div class="segmented" id="periodSeg" role="tablist" aria-label="Summary period">
+          <button class="seg" data-period="week">This week</button>
+          <button class="seg" data-period="month">This month</button>
+          <button class="seg" data-period="year">This year</button>
+          <button class="seg" data-period="all">All time</button>
+        </div>
+      </div>
+
+      <div class="cards" id="cards">
+        <article class="card revenue">
+          <div class="card-label">Revenue</div>
+          <div class="card-value" id="sumRevenue">—</div>
+          <div class="card-foot" id="sumRevenueFoot"></div>
+        </article>
+        <article class="card cost">
+          <div class="card-label">Costs</div>
+          <div class="card-value" id="sumCost">—</div>
+          <div class="card-foot" id="sumCostFoot"></div>
+        </article>
+        <article class="card net">
+          <div class="card-label">Net profit</div>
+          <div class="card-value" id="sumNet">—</div>
+          <div class="card-foot" id="sumNetFoot"></div>
+        </article>
+        <article class="card margin">
+          <div class="card-label">Profit margin</div>
+          <div class="card-value" id="sumMargin">—</div>
+          <div class="card-foot" id="sumMarginFoot"></div>
+        </article>
+        <article class="card mrr">
+          <div class="card-label">Recurring revenue / mo <span class="hint" title="Monthly equivalent of all active recurring revenue (MRR)">?</span></div>
+          <div class="card-value" id="sumMrr">—</div>
+          <div class="card-foot" id="sumMrrFoot"></div>
+        </article>
+        <article class="card burn">
+          <div class="card-label">Recurring costs / mo <span class="hint" title="Monthly equivalent of all active recurring costs">?</span></div>
+          <div class="card-value" id="sumBurn">—</div>
+          <div class="card-foot" id="sumBurnFoot"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Time-series -->
+    <section class="panel chart-panel wide">
+      <div class="panel-head">
+        <h2 class="panel-title">Revenue vs. costs over time</h2>
+        <div class="head-controls">
+          <div class="segmented" id="granSeg" role="tablist" aria-label="Granularity">
+            <button class="seg" data-gran="weekly">Weekly</button>
+            <button class="seg" data-gran="monthly">Monthly</button>
+          </div>
+          <select id="rangeSel" class="ctrl" aria-label="Range"></select>
+        </div>
+      </div>
+      <div class="chart-box tall">
+        <canvas id="seriesChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Cumulative -->
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Cumulative net (cash position)</h2>
+      </div>
+      <div class="chart-box">
+        <canvas id="cumChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Cost breakdown -->
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Cost breakdown</h2>
+        <span class="panel-note" id="costBreakNote"></span>
+      </div>
+      <div class="chart-box">
+        <canvas id="costChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Revenue breakdown -->
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Revenue breakdown</h2>
+        <span class="panel-note" id="revBreakNote"></span>
+      </div>
+      <div class="chart-box">
+        <canvas id="revChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Entries -->
+    <section class="panel entries-panel wide">
+      <div class="panel-head">
+        <h2 class="panel-title">Entries <span class="count-badge" id="entryCount">0</span></h2>
+        <div class="head-controls">
+          <input type="search" id="search" class="ctrl" placeholder="Search…" aria-label="Search entries" />
+          <select id="kindFilter" class="ctrl" aria-label="Filter by type">
+            <option value="all">All types</option>
+            <option value="revenue">Revenue</option>
+            <option value="cost">Costs</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="entries-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Client / Source</th>
+              <th>Recurrence</th>
+              <th>Start</th>
+              <th class="num">Amount</th>
+              <th class="actions-col"></th>
+            </tr>
+          </thead>
+          <tbody id="entriesBody"></tbody>
+        </table>
+        <div id="emptyState" class="empty-state" hidden>
+          <div class="empty-illus">📊</div>
+          <h3>No entries yet</h3>
+          <p>Add your first revenue or cost — or load sample data to explore.</p>
+          <div class="empty-actions">
+            <button class="ctrl primary" data-action="add">+ Add entry</button>
+            <button class="ctrl" data-action="sample">Load sample data</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Data is stored locally in this browser. Export regularly to back up or share.</span>
+  </footer>
+
+  <!-- Entry modal -->
+  <div class="modal-overlay" id="modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h3 id="modalTitle">Add entry</h3>
+        <button class="icon-btn" id="modalClose" aria-label="Close">✕</button>
+      </div>
+      <form id="entryForm" class="modal-form">
+        <input type="hidden" id="entryId" />
+
+        <div class="field">
+          <span class="field-label">Type</span>
+          <div class="kind-toggle">
+            <label class="kind-opt revenue">
+              <input type="radio" name="kind" value="revenue" checked />
+              <span>Revenue</span>
+            </label>
+            <label class="kind-opt cost">
+              <input type="radio" name="kind" value="cost" />
+              <span>Cost</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="f-desc">Description</label>
+          <input id="f-desc" name="description" type="text" required placeholder="e.g. Acme Co. retainer" />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="f-amount">Amount</label>
+            <input id="f-amount" name="amount" type="number" min="0" step="0.01" required placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="f-recurrence">Recurrence</label>
+            <select id="f-recurrence" name="recurrence">
+              <option value="once">One-time</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly" selected>Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="f-category">Category</label>
+            <input id="f-category" name="category" type="text" list="catList" placeholder="e.g. Hosting" />
+            <datalist id="catList"></datalist>
+          </div>
+          <div class="field">
+            <label class="field-label" for="f-client">Client / Source <span class="opt">optional</span></label>
+            <input id="f-client" name="client" type="text" placeholder="e.g. Acme Co." />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="f-date">Start date</label>
+            <input id="f-date" name="date" type="date" required />
+          </div>
+          <div class="field" id="endField">
+            <label class="field-label" for="f-end">Ends <span class="opt">optional</span></label>
+            <input id="f-end" name="endDate" type="date" />
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="ctrl" id="deleteBtn" hidden>Delete</button>
+          <div class="spacer"></div>
+          <button type="button" class="ctrl" id="cancelBtn">Cancel</button>
+          <button type="submit" class="ctrl primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <input type="file" id="importFile" accept="application/json,.json" hidden />
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
