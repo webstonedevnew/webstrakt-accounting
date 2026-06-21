@@ -4,8 +4,9 @@
    per-client profitability, and charts. No build step.
    ============================================================ */
 
-const STORE_KEY = 'webstrakt_tracker_v2';
-const OLD_KEYS = ['webstrakt_tracker_v1'];
+const STORE_KEY = 'webstrakt_tracker_v3';
+const OLD_KEYS = ['webstrakt_tracker_v1', 'webstrakt_tracker_v2'];
+const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK', 'PLN', 'JPY', 'INR'];
 
 const DEFAULT_SETTINGS = {
   currency: 'EUR',
@@ -75,6 +76,12 @@ function fmtCompact(n) {
   const sym = (0).toLocaleString(undefined, { style: 'currency', currency: state.settings.currency }).replace(/[\d.,\s]/g, '');
   return sym + new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
 }
+function fmtCur(n, cur) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || state.settings.currency, maximumFractionDigits: 2 }).format(n || 0); }
+
+/* ---------- currency: base + per-entry conversion ---------- */
+function baseCur() { return state.settings.currency; }
+function entryCur(e) { return e.currency || state.settings.currency; }
+function baseAmt(e) { return e.amount * (e.rate || 1); } // value in base currency (locked at entry's rate)
 
 /* ---------- clients ---------- */
 function getCustomer(id) { return state.customers.find(c => c.id === id) || null; }
@@ -128,9 +135,9 @@ function monthlyEq(e) {
   const s = parseDate(e.date);
   const end = e.endDate ? parseDate(e.endDate) : null;
   if (s > t || (end && end < t)) return 0;
-  if (e.recurrence === 'weekly') return e.amount * 52 / 12;
-  if (e.recurrence === 'monthly') return e.amount;
-  if (e.recurrence === 'yearly') return e.amount / 12;
+  if (e.recurrence === 'weekly') return baseAmt(e) * 52 / 12;
+  if (e.recurrence === 'monthly') return baseAmt(e);
+  if (e.recurrence === 'yearly') return baseAmt(e) / 12;
   return 0;
 }
 
@@ -150,7 +157,7 @@ function earliestDate() {
 function totalsFor(entries, s, e) {
   let revenue = 0, cost = 0;
   for (const en of entries) {
-    const sum = occurrences(en, s, e).length * en.amount;
+    const sum = occurrences(en, s, e).length * baseAmt(en);
     if (en.kind === 'revenue') revenue += sum; else cost += sum;
   }
   return { revenue, cost, net: revenue - cost };
@@ -162,7 +169,7 @@ function categoryBreakdown(kind, period) {
   const map = {};
   for (const en of state.entries) {
     if (en.kind !== kind) continue;
-    const n = occurrences(en, s, e).length * en.amount;
+    const n = occurrences(en, s, e).length * baseAmt(en);
     if (!n) continue;
     const key = (en.category || '').trim() || 'Uncategorized';
     map[key] = (map[key] || 0) + n;
@@ -174,7 +181,7 @@ function clientBreakdown(kind, period) {
   const map = {};
   for (const en of state.entries) {
     if (en.kind !== kind) continue;
-    const n = occurrences(en, s, e).length * en.amount;
+    const n = occurrences(en, s, e).length * baseAmt(en);
     if (!n) continue;
     const key = customerName(en.customerId) || 'Agency / overhead';
     map[key] = (map[key] || 0) + n;
@@ -215,7 +222,7 @@ function bucketize(entries, buckets) {
   for (const en of entries) {
     for (const d of occurrences(en, winStart, winEnd)) {
       const idx = findBucket(d); if (idx < 0) continue;
-      if (en.kind === 'revenue') rev[idx] += en.amount; else cost[idx] += en.amount;
+      if (en.kind === 'revenue') rev[idx] += baseAmt(en); else cost[idx] += baseAmt(en);
     }
   }
   const net = rev.map((r, i) => r - cost[i]);
@@ -367,6 +374,9 @@ const RECUR_LABEL = { once: 'One-time', weekly: 'Weekly', monthly: 'Monthly', ye
 function entryRowHTML(e, opts = {}) {
   const sign = e.kind === 'revenue' ? '+' : '−';
   const amtClass = e.kind === 'revenue' ? 'value-pos' : 'value-neg';
+  const cur = entryCur(e);
+  const foreign = cur !== baseCur();
+  const amtCell = `${sign}${fmtCur(e.amount, cur)}` + (foreign ? `<span class="amount-sub">≈ ${fmtMoney(baseAmt(e))}</span>` : '');
   const recurring = e.recurrence !== 'once';
   const paused = recurring && e.status === 'paused';
   const recCell = `<span class="tag">${RECUR_LABEL[e.recurrence] || e.recurrence}</span>` + (paused ? ' <span class="tag paused">Paused</span>' : '');
@@ -381,7 +391,7 @@ function entryRowHTML(e, opts = {}) {
       <td><div class="desc-cell"><span class="kind-dot ${e.kind}"></span>${esc(e.description)}</div></td>
       <td>${recCell}</td>
       <td class="muted">${dateCell}</td>
-      <td class="num amount-cell ${amtClass}">${sign}${fmtMoney(e.amount)}</td>
+      <td class="num amount-cell ${amtClass}">${amtCell}</td>
       <td class="actions-col"><div class="row-actions"><button class="row-btn" data-edit="${e.id}">Edit</button></div></td>
     </tr>`;
   }
@@ -391,7 +401,7 @@ function entryRowHTML(e, opts = {}) {
     <td>${clientCell}</td>
     <td>${recCell}</td>
     <td class="muted">${dateCell}</td>
-    <td class="num amount-cell ${amtClass}">${sign}${fmtMoney(e.amount)}</td>
+    <td class="num amount-cell ${amtClass}">${amtCell}</td>
     <td class="actions-col"><div class="row-actions">
       <button class="row-btn" data-edit="${e.id}" title="Edit">Edit</button>
       <button class="row-btn del" data-del="${e.id}" title="Delete">Delete</button>
@@ -530,6 +540,8 @@ function openModal(entry, preset) {
     f.querySelector(`input[name="kind"][value="${entry.kind}"]`).checked = true;
     f.description.value = entry.description || '';
     f.amount.value = entry.amount;
+    f.currency.value = entryCur(entry);
+    f.rate.value = entryCur(entry) !== baseCur() ? (entry.rate || '') : '';
     f.recurrence.value = entry.recurrence;
     f.category.value = entry.category || '';
     f.client.value = customerName(entry.customerId) || '';
@@ -539,6 +551,7 @@ function openModal(entry, preset) {
   } else {
     f.date.value = toISODate(today0());
     f.status.value = 'ongoing';
+    f.currency.value = baseCur();
     if (preset) {
       if (preset.kind) f.querySelector(`input[name="kind"][value="${preset.kind}"]`).checked = true;
       if (preset.client) f.client.value = preset.client;
@@ -546,6 +559,7 @@ function openModal(entry, preset) {
   }
   syncCatList();
   syncRecurrenceUI();
+  syncRateField();
   if (detailCustomerId) document.getElementById('detailModal').hidden = true; // tuck detail behind
   modal.hidden = false;
   setTimeout(() => f.description.focus(), 30);
@@ -562,12 +576,60 @@ function syncRecurrenceUI() {
   document.getElementById('statusField').style.display = rec === 'once' ? 'none' : '';
   document.getElementById('endField').hidden = rec === 'once' || status !== 'ends';
 }
+function syncRateField() {
+  const cur = document.getElementById('f-currency').value;
+  const base = baseCur();
+  const field = document.getElementById('rateField');
+  if (cur === base) { field.hidden = true; return; }
+  field.hidden = false;
+  setText('rateLabelCur', `1 ${cur} = ? ${base} on the entry date`);
+  updateRatePreview();
+}
+function updateRatePreview() {
+  const cur = document.getElementById('f-currency').value;
+  const base = baseCur();
+  if (cur === base) return;
+  const amt = parseFloat(document.getElementById('f-amount').value);
+  const rate = parseFloat(document.getElementById('f-rate').value);
+  setText('rateHint', (amt > 0 && rate > 0)
+    ? `≈ ${fmtMoney(amt * rate)} in ${base}`
+    : 'Enter the rate, or tap “Get rate” for the ECB rate on that date.');
+}
+async function fetchRate() {
+  const cur = document.getElementById('f-currency').value;
+  const base = baseCur();
+  if (cur === base) return;
+  const date = document.getElementById('f-date').value || toISODate(today0());
+  const btn = document.getElementById('fetchRate');
+  btn.disabled = true; const label = btn.textContent; btn.textContent = '…';
+  try {
+    const res = await fetch(`https://api.frankfurter.app/${date}?from=${cur}&to=${base}`);
+    if (!res.ok) throw new Error('unavailable');
+    const data = await res.json();
+    const r = data.rates && data.rates[base];
+    if (!r) throw new Error('no rate');
+    document.getElementById('f-rate').value = Math.round(r * 1e6) / 1e6;
+    updateRatePreview();
+    toast(`Rate ${data.date || date}: 1 ${cur} = ${Math.round(r * 1e4) / 1e4} ${base}`);
+  } catch (err) {
+    toast('Could not fetch rate — enter it manually');
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
 function submitForm(ev) {
   ev.preventDefault();
   const f = ev.target;
   const id = document.getElementById('entryId').value;
   const amount = parseFloat(f.amount.value);
   if (!(amount >= 0)) { toast('Enter a valid amount'); return; }
+
+  const currency = f.currency.value;
+  let rate = 1;
+  if (currency !== baseCur()) {
+    rate = parseFloat(f.rate.value);
+    if (!(rate > 0)) { toast(`Enter the exchange rate (1 ${currency} = ? ${baseCur()})`); return; }
+  }
 
   const recurrence = f.recurrence.value;
   let status = 'active', endDate = null;
@@ -582,7 +644,7 @@ function submitForm(ev) {
   const data = {
     kind: f.querySelector('input[name="kind"]:checked').value,
     description: f.description.value.trim() || 'Untitled',
-    amount, recurrence,
+    amount, currency, rate, recurrence,
     category: f.category.value.trim(),
     customerId,
     date: f.date.value, endDate, status,
@@ -665,10 +727,10 @@ function deleteClient(id) {
 /* ---------- import / export ---------- */
 function exportJSON() { download(`webstrakt-data-${toISODate(today0())}.json`, JSON.stringify(state, null, 2), 'application/json'); toast('Exported JSON'); }
 function exportCSV() {
-  const head = ['type', 'description', 'amount', 'recurrence', 'category', 'client', 'status', 'start', 'end'];
+  const head = ['type', 'description', 'amount', 'currency', 'rate_to_base', `base_amount_${baseCur()}`, 'recurrence', 'category', 'client', 'status', 'start', 'end'];
   const lines = [head.join(',')];
   for (const e of state.entries) {
-    lines.push([e.kind, e.description, e.amount, e.recurrence, e.category || '', customerName(e.customerId) || '', e.status || 'active', e.date, e.endDate || ''].map(csvCell).join(','));
+    lines.push([e.kind, e.description, e.amount, entryCur(e), e.rate || 1, baseAmt(e), e.recurrence, e.category || '', customerName(e.customerId) || '', e.status || 'active', e.date, e.endDate || ''].map(csvCell).join(','));
   }
   download(`webstrakt-entries-${toISODate(today0())}.csv`, lines.join('\n'), 'text/csv'); toast('Exported CSV');
 }
@@ -693,6 +755,7 @@ function importJSON(file) {
 /* ---------- sample data ---------- */
 function loadSample() {
   if ((state.entries.length || state.customers.length) && !confirm('Replace current data with sample data?')) return;
+  state.settings.currency = 'EUR'; // sample figures assume a EUR base
   const base = startOfMonth(today0());
   const ago = (n) => toISODate(addMonths(base, -n));
   const C = (name, status, sinceN, notes, color) => ({ id: uid(), name, status, since: ago(sinceN), notes, color });
@@ -705,19 +768,19 @@ function loadSample() {
   state.customers = [acme, north, bright, lumen, harbor];
 
   const E = (kind, description, amount, recurrence, category, custId, startN, opt = {}) =>
-    ({ id: uid(), createdAt: Date.now(), kind, description, amount, recurrence, category, customerId: custId, date: ago(startN), endDate: opt.end != null ? ago(opt.end) : null, status: opt.status || 'active' });
+    ({ id: uid(), createdAt: Date.now(), kind, description, amount, currency: opt.cur || 'EUR', rate: opt.rate != null ? opt.rate : 1, recurrence, category, customerId: custId, date: ago(startN), endDate: opt.end != null ? ago(opt.end) : null, status: opt.status || 'active' });
 
   state.entries = [
-    // Revenue — clients
+    // Revenue — clients (Brightwave is a US client billed in USD)
     E('revenue', 'Acme — monthly retainer', 2500, 'monthly', 'Retainer', acme.id, 10),
     E('revenue', 'Acme — managed hosting', 49, 'monthly', 'Hosting', acme.id, 10),
     E('revenue', 'Northwind — support plan', 600, 'monthly', 'Maintenance & support', north.id, 7),
-    E('revenue', 'Brightwave — e-commerce build', 9200, 'once', 'E-commerce', bright.id, 4),
-    E('revenue', 'Brightwave — support plan', 350, 'monthly', 'Maintenance & support', bright.id, 3),
+    E('revenue', 'Brightwave — e-commerce build', 9200, 'once', 'E-commerce', bright.id, 4, { cur: 'USD', rate: 0.92 }),
+    E('revenue', 'Brightwave — support plan', 350, 'monthly', 'Maintenance & support', bright.id, 3, { cur: 'USD', rate: 0.92 }),
     E('revenue', 'Lumen — landing page', 2400, 'once', 'Website project', lumen.id, 2),
     E('revenue', 'Acme — annual SEO audit', 1800, 'yearly', 'SEO / marketing', acme.id, 6),
     // Costs — client-attributed
-    E('cost', 'Brightwave — freelance designer', 1700, 'once', 'Subcontractors', bright.id, 4),
+    E('cost', 'Brightwave — freelance designer', 1700, 'once', 'Subcontractors', bright.id, 4, { cur: 'USD', rate: 0.92 }),
     E('cost', 'Acme — premium plugin licenses', 120, 'yearly', 'Software licenses', acme.id, 6),
     // Costs — agency overhead (no client)
     E('cost', 'Vercel Pro', 20, 'monthly', 'Hosting & servers', null, 11),
@@ -729,7 +792,28 @@ function loadSample() {
     E('cost', 'MacBook Pro', 2400, 'once', 'Equipment', null, 6),
     E('cost', 'Old SEO tool (cancelled)', 99, 'monthly', 'SaaS & tools', null, 9, { end: 3 }),
   ];
-  save(); renderAll(); toast('Sample data loaded');
+  save(); document.getElementById('currency').value = 'EUR'; renderAll(); toast('Sample data loaded');
+}
+
+/* ---------- base currency ---------- */
+function changeBaseCurrency(newBase) {
+  const old = state.settings.currency;
+  if (newBase === old) return;
+  if (state.entries.length) {
+    const input = prompt(
+      `Change base currency from ${old} to ${newBase}.\n\n` +
+      `Your figures are stored in ${old}. Enter a rate to convert them all:\n` +
+      `How many ${newBase} = 1 ${old}?\n\n` +
+      `(Enter 1 to relabel only, without converting. Cancel to abort.)`, '');
+    if (input === null) { document.getElementById('currency').value = old; return; }
+    const r = parseFloat(input);
+    if (!(r > 0)) { toast('Invalid rate — base currency unchanged'); document.getElementById('currency').value = old; return; }
+    state.entries.forEach(en => { en.rate = (en.rate || 1) * r; });
+  }
+  state.settings.currency = newBase;
+  save(); renderAll();
+  if (detailCustomerId) openClientDetail(detailCustomerId);
+  toast(`Base currency set to ${newBase}`);
 }
 
 /* ---------- theme & controls ---------- */
@@ -835,7 +919,7 @@ function wireEvents() {
   document.getElementById('clientStatusFilter').addEventListener('change', (e) => { state.settings.clientStatus = e.target.value; save(); renderClients(); });
   document.getElementById('clientSort').addEventListener('change', (e) => { state.settings.clientSort = e.target.value; save(); renderClients(); });
 
-  document.getElementById('currency').addEventListener('change', (e) => { state.settings.currency = e.target.value; save(); renderAll(); if (detailCustomerId) openClientDetail(detailCustomerId); });
+  document.getElementById('currency').addEventListener('change', (e) => changeBaseCurrency(e.target.value));
   document.getElementById('themeToggle').addEventListener('click', () => { state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); renderCharts(); if (detailCustomerId) renderDetailChart(detailCustomerId); });
   document.getElementById('menuBtn').addEventListener('click', (e) => { e.stopPropagation(); const m = document.getElementById('menu'); m.hidden = !m.hidden; });
 
@@ -851,6 +935,10 @@ function wireEvents() {
   document.querySelectorAll('input[name="kind"]').forEach(r => r.addEventListener('change', syncCatList));
   document.getElementById('f-recurrence').addEventListener('change', syncRecurrenceUI);
   document.getElementById('f-status').addEventListener('change', syncRecurrenceUI);
+  document.getElementById('f-currency').addEventListener('change', syncRateField);
+  document.getElementById('f-amount').addEventListener('input', updateRatePreview);
+  document.getElementById('f-rate').addEventListener('input', updateRatePreview);
+  document.getElementById('fetchRate').addEventListener('click', fetchRate);
   document.getElementById('importFile').addEventListener('change', (e) => { if (e.target.files[0]) importJSON(e.target.files[0]); e.target.value = ''; });
 
   // client modal

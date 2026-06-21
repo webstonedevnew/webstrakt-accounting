@@ -32,9 +32,24 @@ month-to-month.
 - **Client detail** — full stats, a 12-month revenue-vs-cost chart, and the client's entries,
   with a one-click "add entry for this client".
 
+### Multi-currency
+- Pick a **base (reporting) currency** in the top bar — all totals, charts, and client stats are
+  shown in it.
+- Each entry can be in **its own currency**. For a foreign-currency entry you record the
+  **exchange rate on that entry's date**, and its base-currency value is **locked in** at that
+  rate (the historical-cost approach real accounting software uses — old entries are never
+  re-converted at today's rate).
+- A **"Get rate"** button fetches the ECB reference rate for the entry's date from the free,
+  key-less [Frankfurter](https://www.frankfurter.app/) API; you can always type the rate manually
+  (works offline).
+- Changing the base currency is an explicit, one-time conversion at a rate you supply — not a
+  silent re-label.
+
 ### Everywhere
-- **Dark & light themes**, currency selector, and JSON / CSV export plus JSON import for backup.
-- **Local-first** — all data lives in your browser's `localStorage`. Nothing is sent anywhere.
+- **Dark & light themes** and JSON / CSV export plus JSON import for backup (CSV includes each
+  entry's original amount, currency, rate, and base-currency value).
+- **Local-first** — all data lives in your browser's `localStorage`. The only network call is the
+  optional exchange-rate lookup.
 
 ## Run it
 
