@@ -6,7 +6,7 @@
 
 const STORE_KEY = 'webstrakt_tracker_v3';
 const OLD_KEYS = ['webstrakt_tracker_v1', 'webstrakt_tracker_v2'];
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK', 'PLN', 'JPY', 'INR'];
+const CURRENCIES = ['EUR', 'USD', 'HUF'];
 
 const DEFAULT_SETTINGS = {
   currency: 'EUR',
@@ -41,7 +41,8 @@ function load() {
       state.customers = Array.isArray(parsed.customers) ? parsed.customers : [];
       state.settings = { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) };
     }
-    OLD_KEYS.forEach(k => localStorage.removeItem(k)); // drop pre-v2 test data
+    if (!CURRENCIES.includes(state.settings.currency)) state.settings.currency = 'EUR';
+    OLD_KEYS.forEach(k => localStorage.removeItem(k)); // drop superseded data
   } catch (e) { console.warn('Failed to load state', e); }
 }
 function save() {
@@ -70,18 +71,37 @@ function fmtWeekLabel(d) { return `${MONTHS[d.getMonth()]} ${d.getDate()}`; }
 function fmtDateNice(s) { const d = parseDate(s); return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; }
 
 /* ---------- money ---------- */
-function fmtMoney(n) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: state.settings.currency, maximumFractionDigits: 2 }).format(n || 0); }
+// Modern forint is used in whole units, so override its ISO-legacy 2 decimals.
+const MINOR_OVERRIDE = { HUF: 0 };
+const _minor = {};
+function minorUnits(cur) {
+  if (cur in MINOR_OVERRIDE) return MINOR_OVERRIDE[cur];
+  if (_minor[cur] == null) {
+    try { _minor[cur] = new Intl.NumberFormat('en', { style: 'currency', currency: cur }).resolvedOptions().maximumFractionDigits; }
+    catch (e) { _minor[cur] = 2; }
+  }
+  return _minor[cur];
+}
+function roundTo(n, dp) { const f = Math.pow(10, dp); return Math.round((n + Number.EPSILON) * f) / f; }
+function moneyFmt(cur) {
+  const o = { style: 'currency', currency: cur };
+  if (cur in MINOR_OVERRIDE) { o.minimumFractionDigits = MINOR_OVERRIDE[cur]; o.maximumFractionDigits = MINOR_OVERRIDE[cur]; }
+  return new Intl.NumberFormat(undefined, o);
+}
+function fmtMoney(n) { return moneyFmt(state.settings.currency).format(n || 0); }
 function fmtMoney0(n) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: state.settings.currency, maximumFractionDigits: 0 }).format(n || 0); }
 function fmtCompact(n) {
   const sym = (0).toLocaleString(undefined, { style: 'currency', currency: state.settings.currency }).replace(/[\d.,\s]/g, '');
   return sym + new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
 }
-function fmtCur(n, cur) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || state.settings.currency, maximumFractionDigits: 2 }).format(n || 0); }
+function fmtCur(n, cur) { return moneyFmt(cur || state.settings.currency).format(n || 0); }
 
 /* ---------- currency: base + per-entry conversion ---------- */
 function baseCur() { return state.settings.currency; }
 function entryCur(e) { return e.currency || state.settings.currency; }
-function baseAmt(e) { return e.amount * (e.rate || 1); } // value in base currency (locked at entry's rate)
+// Value in base currency, locked at the entry's rate and rounded to the base
+// currency's minor unit so every line item is a clean amount before summing.
+function baseAmt(e) { return roundTo(e.amount * (e.rate || 1), minorUnits(baseCur())); }
 
 /* ---------- clients ---------- */
 function getCustomer(id) { return state.customers.find(c => c.id === id) || null; }
@@ -142,12 +162,15 @@ function monthlyEq(e) {
 }
 
 /* ---------- aggregation ---------- */
+// Period totals are actuals "to date": each period runs from its start up to
+// today (week-to-date, month-to-date, year-to-date, lifetime). Future-dated
+// occurrences are not counted as booked — the MRR/recurring cards cover run-rate.
 function periodWindow(period) {
   const t = today0();
-  if (period === 'week') return [startOfWeek(t), addDays(startOfWeek(t), 6)];
-  if (period === 'month') return [startOfMonth(t), endOfMonth(t)];
-  if (period === 'year') return [startOfYear(t), endOfYear(t)];
-  return [earliestDate(), t]; // all-time: realized to today
+  if (period === 'week') return [startOfWeek(t), t];
+  if (period === 'month') return [startOfMonth(t), t];
+  if (period === 'year') return [startOfYear(t), t];
+  return [earliestDate(), t]; // all-time
 }
 function earliestDate() {
   const t = today0(); let earliest = t;
@@ -215,19 +238,24 @@ function buildSeries() {
   return bucketize(state.entries, buckets);
 }
 function bucketize(entries, buckets) {
-  const winStart = buckets[0].start, winEnd = buckets[buckets.length - 1].end;
+  const winStart = buckets[0].start, lastEnd = buckets[buckets.length - 1].end;
+  const t = today0();
+  const genEnd = lastEnd < t ? lastEnd : t; // actuals only: don't count beyond today
   const rev = new Array(buckets.length).fill(0);
   const cost = new Array(buckets.length).fill(0);
   const findBucket = (date) => { for (let i = 0; i < buckets.length; i++) if (date >= buckets[i].start && date <= buckets[i].end) return i; return -1; };
   for (const en of entries) {
-    for (const d of occurrences(en, winStart, winEnd)) {
+    for (const d of occurrences(en, winStart, genEnd)) {
       const idx = findBucket(d); if (idx < 0) continue;
       if (en.kind === 'revenue') rev[idx] += baseAmt(en); else cost[idx] += baseAmt(en);
     }
   }
   const net = rev.map((r, i) => r - cost[i]);
-  let run = 0; const cum = net.map(n => (run += n));
-  return { labels: buckets.map(b => b.label), rev, cost, net, cum };
+  // Seed the running total with everything before the window so the cumulative
+  // line is a true cash position (its last point equals lifetime net).
+  const opening = totalsFor(entries, new Date(1970, 0, 1), addDays(winStart, -1)).net;
+  let run = opening; const cum = net.map(n => (run += n));
+  return { labels: buckets.map(b => b.label), rev, cost, net, cum, opening };
 }
 function last12Months(entries) {
   const t = today0(); const cm = startOfMonth(t); const buckets = [];

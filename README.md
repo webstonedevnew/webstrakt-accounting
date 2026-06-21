@@ -15,9 +15,10 @@ month-to-month.
   (until cancelled), ends-on-a-date, or paused.
 - **Automatic expansion** — recurring entries are expanded across the timeline so weekly and
   monthly totals are always correct; paused entries are excluded everywhere.
-- **Overview cards** — revenue, costs, net profit, and margin for the selected period
-  (this week / month / year / all time), plus **MRR** (monthly recurring revenue), recurring
-  burn, and net recurring per month.
+- **Overview cards** — revenue, costs, net profit, and margin for the selected period. Periods
+  are **to-date actuals** (week-to-date, month-to-date, year-to-date, lifetime) — future-dated
+  occurrences aren't counted as booked. The **MRR** / recurring-burn cards are the forward
+  run-rate (monthly equivalent of active recurring items).
 - **Charts** — revenue vs. costs over time (weekly or monthly) with a net-profit line;
   cumulative net (cash position); cost breakdown; and revenue breakdown **by category or by
   client**.
@@ -32,13 +33,14 @@ month-to-month.
 - **Client detail** — full stats, a 12-month revenue-vs-cost chart, and the client's entries,
   with a one-click "add entry for this client".
 
-### Multi-currency
+### Multi-currency (EUR · USD · HUF)
 - Pick a **base (reporting) currency** in the top bar — all totals, charts, and client stats are
-  shown in it.
+  shown in it. (HUF is formatted in whole forints.)
 - Each entry can be in **its own currency**. For a foreign-currency entry you record the
   **exchange rate on that entry's date**, and its base-currency value is **locked in** at that
   rate (the historical-cost approach real accounting software uses — old entries are never
-  re-converted at today's rate).
+  re-converted at today's rate). Each line item is rounded to the base currency's minor unit
+  before summing, so totals never drift by a cent.
 - A **"Get rate"** button fetches the ECB reference rate for the entry's date from the free,
   key-less [Frankfurter](https://www.frankfurter.app/) API; you can always type the rate manually
   (works offline).
