@@ -82,6 +82,7 @@ function fmtCompact(n) {
 // Returns array of Date occurrences of `entry` within [winStart, winEnd].
 function occurrences(entry, winStart, winEnd) {
   const out = [];
+  if (entry.status === 'paused') return out; // parked: excluded from all totals
   const start = parseDate(entry.date);
   const hardEnd = entry.endDate ? parseDate(entry.endDate) : null;
   const limit = hardEnd && hardEnd < winEnd ? hardEnd : winEnd;
@@ -144,7 +145,7 @@ function recurringMonthly(kind) {
   const t = today0();
   let total = 0;
   for (const en of state.entries) {
-    if (en.kind !== kind || en.recurrence === 'once') continue;
+    if (en.kind !== kind || en.recurrence === 'once' || en.status === 'paused') continue;
     const start = parseDate(en.date);
     const end = en.endDate ? parseDate(en.endDate) : null;
     if (start > t) continue;
@@ -386,12 +387,20 @@ function renderTable() {
     const tr = document.createElement('tr');
     const sign = e.kind === 'revenue' ? '+' : '−';
     const amtClass = e.kind === 'revenue' ? 'value-pos' : 'value-neg';
+    const recurring = e.recurrence !== 'once';
+    const paused = recurring && e.status === 'paused';
+    if (paused) tr.classList.add('paused-row');
+    const recCell = `<span class="tag">${RECUR_LABEL[e.recurrence] || e.recurrence}</span>`
+      + (paused ? ' <span class="tag paused">Paused</span>' : '');
+    let dateCell = fmtDateNice(e.date);
+    if (e.endDate) dateCell += ` → ${fmtDateNice(e.endDate)}`;
+    else if (recurring) dateCell += ' · ongoing';
     tr.innerHTML = `
       <td><div class="desc-cell"><span class="kind-dot ${e.kind}"></span>${esc(e.description)}</div></td>
       <td>${e.category ? `<span class="tag">${esc(e.category)}</span>` : '<span class="muted">—</span>'}</td>
       <td>${e.client ? esc(e.client) : '<span class="muted">—</span>'}</td>
-      <td><span class="tag">${RECUR_LABEL[e.recurrence] || e.recurrence}</span></td>
-      <td class="muted">${fmtDateNice(e.date)}${e.endDate ? ` → ${fmtDateNice(e.endDate)}` : ''}</td>
+      <td>${recCell}</td>
+      <td class="muted">${dateCell}</td>
       <td class="num amount-cell ${amtClass}">${sign}${fmtMoney(e.amount)}</td>
       <td class="actions-col"><div class="row-actions">
         <button class="row-btn" data-edit="${e.id}" title="Edit">Edit</button>
@@ -423,11 +432,13 @@ function openModal(entry) {
     f.client.value = entry.client || '';
     f.date.value = entry.date;
     f.endDate.value = entry.endDate || '';
+    f.status.value = entry.status === 'paused' ? 'paused' : (entry.endDate ? 'ends' : 'ongoing');
   } else {
     f.date.value = toISODate(today0());
+    f.status.value = 'ongoing';
   }
   syncCatList();
-  syncEndField();
+  syncRecurrenceUI();
   modal.hidden = false;
   setTimeout(() => f.description.focus(), 30);
 }
@@ -438,9 +449,18 @@ function syncCatList() {
   const list = document.getElementById('catList');
   list.innerHTML = CATEGORY_SUGGESTIONS[kind].map(c => `<option value="${c}"></option>`).join('');
 }
-function syncEndField() {
+function syncRecurrenceUI() {
   const rec = document.getElementById('f-recurrence').value;
-  document.getElementById('endField').style.visibility = rec === 'once' ? 'hidden' : 'visible';
+  const status = document.getElementById('f-status').value;
+  const statusField = document.getElementById('statusField');
+  const endField = document.getElementById('endField');
+  if (rec === 'once') {
+    statusField.style.display = 'none';
+    endField.hidden = true;
+  } else {
+    statusField.style.display = '';
+    endField.hidden = status !== 'ends';
+  }
 }
 
 function submitForm(ev) {
@@ -450,15 +470,29 @@ function submitForm(ev) {
   const amount = parseFloat(f.amount.value);
   if (!(amount >= 0)) { toast('Enter a valid amount'); return; }
 
+  const recurrence = f.recurrence.value;
+  let status = 'active';
+  let endDate = null;
+  if (recurrence !== 'once') {
+    const mode = f.status.value;
+    if (mode === 'paused') {
+      status = 'paused';
+    } else if (mode === 'ends') {
+      if (!f.endDate.value) { toast('Pick an end date'); return; }
+      endDate = f.endDate.value;
+    }
+  }
+
   const data = {
     kind: f.querySelector('input[name="kind"]:checked').value,
     description: f.description.value.trim() || 'Untitled',
     amount,
-    recurrence: f.recurrence.value,
+    recurrence,
     category: f.category.value.trim(),
     client: f.client.value.trim(),
     date: f.date.value,
-    endDate: (f.recurrence.value !== 'once' && f.endDate.value) ? f.endDate.value : null,
+    endDate,
+    status,
   };
   if (!data.date) { toast('Pick a start date'); return; }
 
@@ -654,7 +688,8 @@ function wireEvents() {
   document.getElementById('deleteBtn').addEventListener('click', () => deleteEntry(document.getElementById('entryId').value));
   modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
   document.querySelectorAll('input[name="kind"]').forEach(r => r.addEventListener('change', syncCatList));
-  document.getElementById('f-recurrence').addEventListener('change', syncEndField);
+  document.getElementById('f-recurrence').addEventListener('change', syncRecurrenceUI);
+  document.getElementById('f-status').addEventListener('change', syncRecurrenceUI);
   document.getElementById('importFile').addEventListener('change', (e) => { if (e.target.files[0]) importJSON(e.target.files[0]); e.target.value = ''; });
 
   document.addEventListener('keydown', (e) => {

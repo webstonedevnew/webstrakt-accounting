@@ -278,6 +278,9 @@ input.ctrl { cursor: text; }
 }
 .muted { color: var(--text-faint); }
 .amount-cell { font-weight: 600; white-space: nowrap; }
+.tag.paused { color: #fbbf24; background: rgba(251,191,36,0.10); border-color: rgba(251,191,36,0.40); }
+.entries-table tr.paused-row { opacity: 0.55; }
+.entries-table tr.paused-row:hover { opacity: 1; }
 
 .row-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity .12s; }
 .entries-table tbody tr:hover .row-actions { opacity: 1; }
