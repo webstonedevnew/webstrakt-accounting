@@ -546,10 +546,11 @@ function openModal(entry, preset) {
   }
   syncCatList();
   syncRecurrenceUI();
+  if (detailCustomerId) document.getElementById('detailModal').hidden = true; // tuck detail behind
   modal.hidden = false;
   setTimeout(() => f.description.focus(), 30);
 }
-function closeModal() { modal.hidden = true; }
+function closeModal() { modal.hidden = true; if (detailCustomerId) openClientDetail(detailCustomerId); }
 function syncClientList() { document.getElementById('clientList').innerHTML = state.customers.map(c => `<option value="${esc(c.name)}"></option>`).join(''); }
 function syncCatList() {
   const kind = document.querySelector('input[name="kind"]:checked').value;
@@ -595,15 +596,13 @@ function submitForm(ev) {
     state.entries.push({ id: uid(), createdAt: Date.now(), ...data });
     toast('Entry added');
   }
-  save(); renderAll(); closeModal();
-  if (detailCustomerId) openClientDetail(detailCustomerId); // refresh detail if open
+  save(); renderAll(); closeModal(); // closeModal restores detail view if it was open
 }
 function deleteEntry(id) {
   const e = state.entries.find(x => x.id === id); if (!e) return;
   if (!confirm(`Delete "${e.description}"? This cannot be undone.`)) return;
   state.entries = state.entries.filter(x => x.id !== id);
   save(); renderAll(); closeModal();
-  if (detailCustomerId) openClientDetail(detailCustomerId);
   toast('Entry deleted');
 }
 
@@ -626,10 +625,11 @@ function openClientModal(customer) {
     f.since.value = toISODate(today0());
   }
   renderSwatches(color);
+  if (detailCustomerId) document.getElementById('detailModal').hidden = true; // tuck detail behind
   document.getElementById('clientModal').hidden = false;
   setTimeout(() => f.name.focus(), 30);
 }
-function closeClientModal() { document.getElementById('clientModal').hidden = true; }
+function closeClientModal() { document.getElementById('clientModal').hidden = true; if (detailCustomerId) openClientDetail(detailCustomerId); }
 function renderSwatches(selected) {
   document.getElementById('clientSwatches').innerHTML = PALETTE.map(c =>
     `<button type="button" class="swatch${c === selected ? ' selected' : ''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
@@ -649,8 +649,7 @@ function submitClient(ev) {
     state.customers.push({ id: uid(), ...data });
     toast('Client added');
   }
-  save(); renderAll(); closeClientModal();
-  if (detailCustomerId) openClientDetail(detailCustomerId);
+  save(); renderAll(); closeClientModal(); // closeClientModal restores detail view if it was open
 }
 function deleteClient(id) {
   const c = getCustomer(id); if (!c) return;
@@ -659,7 +658,7 @@ function deleteClient(id) {
   if (!confirm(msg)) return;
   state.entries.forEach(e => { if (e.customerId === id) e.customerId = null; });
   state.customers = state.customers.filter(x => x.id !== id);
-  save(); closeClientModal(); closeDetail(); renderAll();
+  save(); closeDetail(); closeClientModal(); renderAll(); // closeDetail first so the modal doesn't reopen
   toast('Client deleted');
 }
 
@@ -867,7 +866,13 @@ function wireEvents() {
   document.getElementById('detailEditBtn').addEventListener('click', () => { const c = getCustomer(detailCustomerId); if (c) openClientModal(c); });
   document.getElementById('detailAddEntryBtn').addEventListener('click', () => { const c = getCustomer(detailCustomerId); if (c) openModal(null, { kind: 'revenue', client: c.name }); });
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(); closeClientModal(); closeDetail(); closeMenu(); } });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!document.getElementById('modal').hidden) closeModal();
+    else if (!document.getElementById('clientModal').hidden) closeClientModal();
+    else if (!document.getElementById('detailModal').hidden) closeDetail();
+    else closeMenu();
+  });
 }
 
 /* ---------- boot ---------- */
