@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Webstrakt · Revenue & Cost Tracker</title>
-  <meta name="description" content="Elegant revenue and cost tracker for a web development business." />
+  <title>Webstrakt · Agency Finances</title>
+  <meta name="description" content="Revenue, cost and client profitability tracker for a web development agency." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -15,8 +15,13 @@
     <div class="brand">
       <span class="brand-dot" aria-hidden="true"></span>
       <span class="brand-name">Webstrakt</span>
-      <span class="brand-sub">Accounting</span>
+      <span class="brand-sub">Agency Finances</span>
     </div>
+
+    <nav class="nav" id="nav" aria-label="Views">
+      <button class="nav-tab" data-view="dashboard">Dashboard</button>
+      <button class="nav-tab" data-view="clients">Clients</button>
+    </nav>
 
     <div class="top-actions">
       <select id="currency" class="ctrl" title="Currency" aria-label="Currency">
@@ -54,148 +59,218 @@
     </div>
   </header>
 
-  <main class="layout">
-    <!-- Summary -->
-    <section class="panel summary-panel">
-      <div class="panel-head">
-        <h2 class="panel-title">Overview</h2>
-        <div class="segmented" id="periodSeg" role="tablist" aria-label="Summary period">
-          <button class="seg" data-period="week">This week</button>
-          <button class="seg" data-period="month">This month</button>
-          <button class="seg" data-period="year">This year</button>
-          <button class="seg" data-period="all">All time</button>
-        </div>
-      </div>
-
-      <div class="cards" id="cards">
-        <article class="card revenue">
-          <div class="card-label">Revenue</div>
-          <div class="card-value" id="sumRevenue">—</div>
-          <div class="card-foot" id="sumRevenueFoot"></div>
-        </article>
-        <article class="card cost">
-          <div class="card-label">Costs</div>
-          <div class="card-value" id="sumCost">—</div>
-          <div class="card-foot" id="sumCostFoot"></div>
-        </article>
-        <article class="card net">
-          <div class="card-label">Net profit</div>
-          <div class="card-value" id="sumNet">—</div>
-          <div class="card-foot" id="sumNetFoot"></div>
-        </article>
-        <article class="card margin">
-          <div class="card-label">Profit margin</div>
-          <div class="card-value" id="sumMargin">—</div>
-          <div class="card-foot" id="sumMarginFoot"></div>
-        </article>
-        <article class="card mrr">
-          <div class="card-label">Recurring revenue / mo <span class="hint" title="Monthly equivalent of all active recurring revenue (MRR)">?</span></div>
-          <div class="card-value" id="sumMrr">—</div>
-          <div class="card-foot" id="sumMrrFoot"></div>
-        </article>
-        <article class="card burn">
-          <div class="card-label">Recurring costs / mo <span class="hint" title="Monthly equivalent of all active recurring costs">?</span></div>
-          <div class="card-value" id="sumBurn">—</div>
-          <div class="card-foot" id="sumBurnFoot"></div>
-        </article>
-      </div>
-    </section>
-
-    <!-- Time-series -->
-    <section class="panel chart-panel wide">
-      <div class="panel-head">
-        <h2 class="panel-title">Revenue vs. costs over time</h2>
-        <div class="head-controls">
-          <div class="segmented" id="granSeg" role="tablist" aria-label="Granularity">
-            <button class="seg" data-gran="weekly">Weekly</button>
-            <button class="seg" data-gran="monthly">Monthly</button>
+  <main>
+    <!-- ===================== DASHBOARD ===================== -->
+    <div id="view-dashboard" class="view layout">
+      <!-- Summary -->
+      <section class="panel summary-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Overview</h2>
+          <div class="segmented" id="periodSeg" role="tablist" aria-label="Summary period">
+            <button class="seg" data-period="week">This week</button>
+            <button class="seg" data-period="month">This month</button>
+            <button class="seg" data-period="year">This year</button>
+            <button class="seg" data-period="all">All time</button>
           </div>
-          <select id="rangeSel" class="ctrl" aria-label="Range"></select>
         </div>
-      </div>
-      <div class="chart-box tall">
-        <canvas id="seriesChart"></canvas>
-      </div>
-    </section>
 
-    <!-- Cumulative -->
-    <section class="panel chart-panel">
-      <div class="panel-head">
-        <h2 class="panel-title">Cumulative net (cash position)</h2>
-      </div>
-      <div class="chart-box">
-        <canvas id="cumChart"></canvas>
-      </div>
-    </section>
+        <div class="cards" id="cards">
+          <article class="card revenue">
+            <div class="card-label">Revenue</div>
+            <div class="card-value" id="sumRevenue">—</div>
+            <div class="card-foot" id="sumRevenueFoot"></div>
+          </article>
+          <article class="card cost">
+            <div class="card-label">Costs</div>
+            <div class="card-value" id="sumCost">—</div>
+            <div class="card-foot" id="sumCostFoot"></div>
+          </article>
+          <article class="card net">
+            <div class="card-label">Net profit</div>
+            <div class="card-value" id="sumNet">—</div>
+            <div class="card-foot" id="sumNetFoot"></div>
+          </article>
+          <article class="card margin">
+            <div class="card-label">Profit margin</div>
+            <div class="card-value" id="sumMargin">—</div>
+            <div class="card-foot" id="sumMarginFoot"></div>
+          </article>
+          <article class="card mrr">
+            <div class="card-label">Recurring revenue / mo <span class="hint" title="Monthly equivalent of all active recurring revenue (MRR)">?</span></div>
+            <div class="card-value" id="sumMrr">—</div>
+            <div class="card-foot" id="sumMrrFoot"></div>
+          </article>
+          <article class="card burn">
+            <div class="card-label">Recurring costs / mo <span class="hint" title="Monthly equivalent of all active recurring costs">?</span></div>
+            <div class="card-value" id="sumBurn">—</div>
+            <div class="card-foot" id="sumBurnFoot"></div>
+          </article>
+        </div>
+      </section>
 
-    <!-- Cost breakdown -->
-    <section class="panel chart-panel">
-      <div class="panel-head">
-        <h2 class="panel-title">Cost breakdown</h2>
-        <span class="panel-note" id="costBreakNote"></span>
-      </div>
-      <div class="chart-box">
-        <canvas id="costChart"></canvas>
-      </div>
-    </section>
+      <!-- Time-series -->
+      <section class="panel chart-panel wide">
+        <div class="panel-head">
+          <h2 class="panel-title">Revenue vs. costs over time</h2>
+          <div class="head-controls">
+            <div class="segmented" id="granSeg" role="tablist" aria-label="Granularity">
+              <button class="seg" data-gran="weekly">Weekly</button>
+              <button class="seg" data-gran="monthly">Monthly</button>
+            </div>
+            <select id="rangeSel" class="ctrl" aria-label="Range"></select>
+          </div>
+        </div>
+        <div class="chart-box tall">
+          <canvas id="seriesChart"></canvas>
+        </div>
+      </section>
 
-    <!-- Revenue breakdown -->
-    <section class="panel chart-panel">
-      <div class="panel-head">
-        <h2 class="panel-title">Revenue breakdown</h2>
+      <!-- Cumulative -->
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Cumulative net (cash position)</h2>
+        </div>
+        <div class="chart-box">
+          <canvas id="cumChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Cost breakdown -->
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Cost breakdown</h2>
+          <span class="panel-note" id="costBreakNote"></span>
+        </div>
+        <div class="chart-box">
+          <canvas id="costChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Revenue breakdown -->
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Revenue breakdown</h2>
+          <div class="head-controls">
+            <div class="segmented" id="revModeSeg" aria-label="Revenue breakdown mode">
+              <button class="seg" data-revmode="category">By category</button>
+              <button class="seg" data-revmode="client">By client</button>
+            </div>
+          </div>
+        </div>
         <span class="panel-note" id="revBreakNote"></span>
-      </div>
-      <div class="chart-box">
-        <canvas id="revChart"></canvas>
-      </div>
-    </section>
-
-    <!-- Entries -->
-    <section class="panel entries-panel wide">
-      <div class="panel-head">
-        <h2 class="panel-title">Entries <span class="count-badge" id="entryCount">0</span></h2>
-        <div class="head-controls">
-          <input type="search" id="search" class="ctrl" placeholder="Search…" aria-label="Search entries" />
-          <select id="kindFilter" class="ctrl" aria-label="Filter by type">
-            <option value="all">All types</option>
-            <option value="revenue">Revenue</option>
-            <option value="cost">Costs</option>
-          </select>
+        <div class="chart-box">
+          <canvas id="revChart"></canvas>
         </div>
-      </div>
-      <div class="table-wrap">
-        <table class="entries-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th>Category</th>
-              <th>Client / Source</th>
-              <th>Recurrence</th>
-              <th>Start</th>
-              <th class="num">Amount</th>
-              <th class="actions-col"></th>
-            </tr>
-          </thead>
-          <tbody id="entriesBody"></tbody>
-        </table>
-        <div id="emptyState" class="empty-state" hidden>
-          <div class="empty-illus">📊</div>
-          <h3>No entries yet</h3>
-          <p>Add your first revenue or cost — or load sample data to explore.</p>
+      </section>
+
+      <!-- Entries -->
+      <section class="panel entries-panel wide">
+        <div class="panel-head">
+          <h2 class="panel-title">Entries <span class="count-badge" id="entryCount">0</span></h2>
+          <div class="head-controls">
+            <input type="search" id="search" class="ctrl" placeholder="Search…" aria-label="Search entries" />
+            <select id="kindFilter" class="ctrl" aria-label="Filter by type">
+              <option value="all">All types</option>
+              <option value="revenue">Revenue</option>
+              <option value="cost">Costs</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="entries-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Client</th>
+                <th>Recurrence</th>
+                <th>Start</th>
+                <th class="num">Amount</th>
+                <th class="actions-col"></th>
+              </tr>
+            </thead>
+            <tbody id="entriesBody"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state" hidden>
+            <div class="empty-illus">📊</div>
+            <h3>No entries yet</h3>
+            <p>Add your first revenue or cost — or load sample data to explore.</p>
+            <div class="empty-actions">
+              <button class="ctrl primary" data-action="add">+ Add entry</button>
+              <button class="ctrl" data-action="sample">Load sample data</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== CLIENTS ===================== -->
+    <div id="view-clients" class="view layout" hidden>
+      <section class="panel summary-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Clients</h2>
+          <div class="head-controls">
+            <select id="clientStatusFilter" class="ctrl" aria-label="Filter clients">
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="lead">Leads</option>
+              <option value="past">Past</option>
+            </select>
+            <select id="clientSort" class="ctrl" aria-label="Sort clients">
+              <option value="revenue">Top revenue</option>
+              <option value="net">Top net</option>
+              <option value="mrr">Top MRR</option>
+              <option value="name">Name (A–Z)</option>
+              <option value="recent">Most recent</option>
+            </select>
+            <button class="ctrl primary" data-action="add-client">+ Add client</button>
+          </div>
+        </div>
+
+        <div class="cards client-summary" id="clientSummary">
+          <article class="card net">
+            <div class="card-label">Active clients</div>
+            <div class="card-value" id="cliActive">—</div>
+            <div class="card-foot" id="cliActiveFoot"></div>
+          </article>
+          <article class="card revenue">
+            <div class="card-label">Client revenue <span class="hint" title="Lifetime revenue attributed to clients">?</span></div>
+            <div class="card-value" id="cliRevenue">—</div>
+            <div class="card-foot">lifetime</div>
+          </article>
+          <article class="card mrr">
+            <div class="card-label">Client MRR</div>
+            <div class="card-value" id="cliMrr">—</div>
+            <div class="card-foot">recurring / mo</div>
+          </article>
+          <article class="card margin">
+            <div class="card-label">Avg revenue / client</div>
+            <div class="card-value" id="cliAvg">—</div>
+            <div class="card-foot">lifetime</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel wide clients-grid-panel">
+        <div class="client-grid" id="clientGrid"></div>
+        <div id="clientEmpty" class="empty-state" hidden>
+          <div class="empty-illus">🤝</div>
+          <h3>No clients yet</h3>
+          <p>Add a client, or attribute an entry to one — they'll appear here automatically.</p>
           <div class="empty-actions">
-            <button class="ctrl primary" data-action="add">+ Add entry</button>
+            <button class="ctrl primary" data-action="add-client">+ Add client</button>
             <button class="ctrl" data-action="sample">Load sample data</button>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </main>
 
   <footer class="footer">
     <span>Data is stored locally in this browser. Export regularly to back up or share.</span>
   </footer>
 
-  <!-- Entry modal -->
+  <!-- ===================== Entry modal ===================== -->
   <div class="modal-overlay" id="modal" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-head">
@@ -247,8 +322,9 @@
             <datalist id="catList"></datalist>
           </div>
           <div class="field">
-            <label class="field-label" for="f-client">Client / Source <span class="opt">optional</span></label>
-            <input id="f-client" name="client" type="text" placeholder="e.g. Acme Co." />
+            <label class="field-label" for="f-client">Client <span class="opt">blank = overhead</span></label>
+            <input id="f-client" name="client" type="text" list="clientList" placeholder="Search or add a client…" />
+            <datalist id="clientList"></datalist>
           </div>
         </div>
 
@@ -279,6 +355,100 @@
           <button type="submit" class="ctrl primary">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ===================== Client modal ===================== -->
+  <div class="modal-overlay" id="clientModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="clientModalTitle">
+      <div class="modal-head">
+        <h3 id="clientModalTitle">Add client</h3>
+        <button class="icon-btn" id="clientModalClose" aria-label="Close">✕</button>
+      </div>
+      <form id="clientForm" class="modal-form">
+        <input type="hidden" id="clientId" />
+        <input type="hidden" id="clientColor" />
+
+        <div class="field">
+          <label class="field-label" for="c-name">Client name</label>
+          <input id="c-name" name="name" type="text" required placeholder="e.g. Acme Co." />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="c-status">Status</label>
+            <select id="c-status" name="status">
+              <option value="active">Active</option>
+              <option value="lead">Lead</option>
+              <option value="past">Past</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="c-since">Client since</label>
+            <input id="c-since" name="since" type="date" />
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Colour</span>
+          <div class="swatches" id="clientSwatches"></div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="c-notes">Notes <span class="opt">optional</span></label>
+          <textarea id="c-notes" name="notes" rows="3" placeholder="Main contact, scope, anything useful…"></textarea>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="ctrl" id="clientDeleteBtn" hidden>Delete</button>
+          <div class="spacer"></div>
+          <button type="button" class="ctrl" id="clientCancelBtn">Cancel</button>
+          <button type="submit" class="ctrl primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== Client detail modal ===================== -->
+  <div class="modal-overlay" id="detailModal" hidden>
+    <div class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailName">
+      <div class="modal-head">
+        <div class="detail-head-main">
+          <span class="client-dot" id="detailDot"></span>
+          <h3 id="detailName">Client</h3>
+          <span class="status-badge" id="detailStatus"></span>
+        </div>
+        <div class="detail-head-actions">
+          <button class="ctrl" id="detailEditBtn">Edit</button>
+          <button class="icon-btn" id="detailClose" aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="detail-meta" id="detailMeta"></div>
+
+        <div class="detail-stats" id="detailStats"></div>
+
+        <div class="detail-section">
+          <div class="detail-section-head">
+            <h4>Revenue vs. costs · last 12 months</h4>
+          </div>
+          <div class="chart-box" style="height: 220px;">
+            <canvas id="detailChart"></canvas>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-head">
+            <h4>Entries <span class="count-badge" id="detailEntryCount">0</span></h4>
+            <button class="ctrl" id="detailAddEntryBtn">+ Add entry for this client</button>
+          </div>
+          <div class="table-wrap">
+            <table class="entries-table compact">
+              <tbody id="detailEntries"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
